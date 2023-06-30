@@ -1,0 +1,42 @@
+const hubspot = require('@hubspot/api-client');
+
+exports.main = (event, callback) => {
+    callback(processEvent(event));
+};
+
+function processEvent(event) {
+    const hubspotClient = new hubspot.Client({
+  accessToken: process.env.secretName 
+});
+
+    let engage_id = event['id'];
+    // console.log(engage_id);
+
+    hubspotClient.crm.objects.basicApi
+        .getById(event.object.objectType, event.object.objectId, ["offer_label", "skupos_loyalty_status"])
+        .then(results => {
+            let engage_enroll = results.body;
+            console.log(engage_enroll)
+
+            hubspotClient.crm.objects.associationsApi
+                .getAll(
+                    event.object.objectType,
+                    event.object.objectId,
+                    ["contacts"]
+                )
+                .then(results => {
+                    let associations = results.body.results;
+                    let contact_ids = associations.map(a => a.id);
+                    console.log(associations, contact_ids);
+
+                    contact_ids.forEach(function (entry) {
+                        hubspotClient.apiRequest({
+                            method: 'POST',
+                            path: `/automation/v2/workflows/22041022/enrollments/contacts/${entry}?process.env.secretName}`
+                        });
+                    });
+                }
+                )
+        }
+        )
+}
